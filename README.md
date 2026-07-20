@@ -69,6 +69,9 @@ python3 answer_block_auditor.py --selftest
 
 ## Reading the output honestly
 
+**Chrome is detected by class, not just by tag.** Most CMS themes build menus, related-post rails and share bars out of plain `<div>`s rather than `<nav>`. Tested against a live WordPress site, tag-only detection counted **341 "content" links and 261 list items on every page** — identical figures across pages, which is the signature of template markup. Class/id/role detection brings that to 37 links and 3–12 list items. `entry-header` and `post-header` are deliberately *not* treated as chrome, because that is where most themes put the H1.
+
+
 **The score is a triage order, not a grade.** It is a weighted checklist, not a model of any real engine. Nobody outside those companies knows their retrieval weights. Use it to rank your pages against each other and to find the obvious structural failures.
 
 **A high score does not mean you will be cited.** Being extractable is necessary, not sufficient — the answer still has to be correct, and the page still has to be found. This measures the mechanics only.

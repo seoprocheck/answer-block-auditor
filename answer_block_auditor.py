@@ -30,6 +30,33 @@ from html.parser import HTMLParser
 UA = "answer-block-auditor/1.0 (+https://github.com/seoprocheck/answer-block-auditor)"
 CHROME_TAGS = {"script", "style", "nav", "header", "footer", "aside", "form",
                "noscript", "svg", "template", "button", "select"}
+
+# Tag-based detection alone is not enough: most CMS themes build their menus,
+# related-post rails and share bars out of plain <div>s. Measured on a real
+# WordPress site that leaked ~340 nav links and ~260 menu list items into every
+# page's "content" counts.
+CHROME_CONTAINERS = {"div", "section", "ul", "ol", "aside", "span", "table"}
+CHROME_HINT = re.compile(
+    r"(^|[-_ ])("
+    r"nav(bar|igation)?|(sub|main|primary|top)?menu|breadcrumbs?|pagination|pager|"
+    r"sidebar|widgets?|footer|(site|global|page|main)[-_]header|masthead|banner|"
+    r"related|recirc|share|social|subscribe|newsletter|cookie|consent|promo|popup|"
+    r"modal|offcanvas|drawer|comments?|disqus|toc|tableofcontents|skip|screen-reader"
+    r")([-_ ]|$)", re.I)
+VOID_TAGS = {"br", "hr", "img", "input", "meta", "link", "source", "track", "wbr",
+             "col", "area", "base", "embed", "param"}
+
+
+def is_chrome_attrs(attrs):
+    """Site chrome by class/id/role. Deliberately does NOT match entry-header or
+    post-header — those hold the H1 on most themes."""
+    blob = " ".join(filter(None, (attrs.get("class"), attrs.get("id"), attrs.get("role"))))
+    if not blob:
+        return False
+    if attrs.get("role") in ("navigation", "banner", "contentinfo", "complementary", "search"):
+        return True
+    return bool(CHROME_HINT.search(blob))
+
 HEADING_TAGS = {"h1", "h2", "h3", "h4"}
 QUESTION_STARTS = ("what", "why", "how", "when", "where", "which", "who", "is", "are",
                    "can", "should", "does", "do", "did", "will", "would", "was", "if")
@@ -43,6 +70,7 @@ class Doc(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.chrome = 0
+        self._stack = []
         self.title = ""
         self._in_title = False
         self.nodes = []              # ordered ("h",lvl,text) / ("p",text) / ("list",n) / ("table",n)
@@ -58,9 +86,16 @@ class Doc(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
+        chrome = False
         if tag in CHROME_TAGS:
             if tag == "script" and (a.get("type") or "").lower() == "application/ld+json":
                 self._in_jsonld = True
+            chrome = True
+        elif tag in CHROME_CONTAINERS and is_chrome_attrs(a):
+            chrome = True
+        if tag not in VOID_TAGS:
+            self._stack.append((tag, chrome))
+        if chrome:
             self.chrome += 1
             return
         if tag == "title":
@@ -81,10 +116,21 @@ class Doc(HTMLParser):
             self._li = 0
 
     def handle_endtag(self, tag):
-        if tag in CHROME_TAGS:
-            if tag == "script" and self._in_jsonld:
-                self._absorb()
-            self.chrome = max(0, self.chrome - 1)
+        if tag == "script" and self._in_jsonld:
+            self._absorb()
+        # Unwind to the matching open tag, clearing chrome for everything popped.
+        # Themes leave tags unclosed constantly; without unwinding, one stray
+        # </div> permanently mis-tracks whether we are inside chrome.
+        closed_chrome = False
+        if any(t == tag for t, _ in self._stack):
+            while self._stack:
+                t, was_chrome = self._stack.pop()
+                if was_chrome:
+                    self.chrome = max(0, self.chrome - 1)
+                    closed_chrome = True
+                if t == tag:
+                    break
+        if closed_chrome or tag in CHROME_TAGS:
             return
         if tag == "title":
             self._in_title = False

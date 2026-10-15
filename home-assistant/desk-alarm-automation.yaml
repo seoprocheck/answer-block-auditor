@@ -1,0 +1,24 @@
+# Rings the tablet at the time set on the desk dashboard.
+# Uses the Companion app's alarm stream, so it sounds even when the tablet
+# is silenced. The notify target assumes the app's device name is "desk".
+alias: Desk alarm
+description: Rings the desk tablet at the time set on the dashboard.
+triggers:
+  - trigger: time
+    at: input_datetime.desk_alarm
+conditions:
+  - condition: state
+    entity_id: input_boolean.desk_alarm_on
+    state: "on"
+actions:
+  - action: notify.mobile_app_desk
+    data:
+      title: "Alarm {{ now().strftime('%H:%M') }}"
+      message: >-
+        {{ state_attr('weather.forecast_home', 'temperature') | round }}° and
+        {{ states('weather.forecast_home') | replace('partlycloudy', 'partly cloudy') | replace('-', ' ') }}.
+      data:
+        ttl: 0
+        priority: high
+        channel: alarm_stream
+mode: single

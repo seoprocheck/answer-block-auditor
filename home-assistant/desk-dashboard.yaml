@@ -1,0 +1,54 @@
+# Desk dashboard for a 16:10 Android tablet (Galaxy Tab FE), replacing an Echo Show 15.
+# Built-in cards only: no HACS needed.
+#
+# Entity IDs resolve with no edits if you name things as in the setup steps:
+#   calendar.agenda             -> Remote Calendar integration, named "Agenda"
+#   input_datetime.desk_alarm   -> Time helper, named "Desk alarm"
+#   input_boolean.desk_alarm_on -> Toggle helper, named "Desk alarm on"
+#   weather.forecast_home       -> HA's default Met.no weather entity
+#   living_room/kitchen/bedroom -> HA's default areas; repoint to your rooms
+title: Desk
+views:
+  - title: Desk
+    path: desk
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: clock
+            clock_size: large
+            grid_options:
+              columns: full
+          - type: markdown
+            text_only: true
+            content: "## {{ now().strftime('%A %-d %B') }}"
+          - type: weather-forecast
+            entity: weather.forecast_home
+            forecast_type: daily
+            show_current: true
+            show_forecast: true
+      - type: grid
+        cards:
+          - type: heading
+            heading: Agenda
+          - type: calendar
+            initial_view: listWeek
+            entities:
+              - calendar.agenda
+      - type: grid
+        cards:
+          - type: heading
+            heading: Alarm
+          - type: tile
+            entity: input_datetime.desk_alarm
+          - type: tile
+            entity: input_boolean.desk_alarm_on
+          - type: heading
+            heading: Home
+          - type: area
+            area: living_room
+          - type: area
+            area: kitchen
+          - type: area
+            area: bedroom
